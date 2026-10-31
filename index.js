@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./src/db.js";
+import eventRoutes from "./src/routes/events.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -12,6 +13,8 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.json({ name: "PeoplePulse API", status: "running" });
 });
+
+app.use("/", eventRoutes);
 
 connectDB()
   .then(() => {
