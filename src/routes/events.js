@@ -206,5 +206,57 @@ router.get("/joined-events", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Could not load joined events" });
   }
 });
+router.put("/events/:id", verifyToken, async (req, res) => {
+  try {
+    const _id = toObjectId(req.params.id);
+    if (!_id) return res.status(400).json({ message: "Invalid event id" });
+
+    const events = getDB().collection("events");
+    const existing = await events.findOne({ _id });
+    if (!existing) return res.status(404).json({ message: "Event not found" });
+
+    if (existing.creatorEmail !== req.user.email) {
+      return res.status(403).json({ message: "You can only edit your own events" });
+    }
+
+    const { errors, data } = validateEvent(req.body);
+
+    if (!errors.volunteersNeeded && data.volunteersNeeded < (existing.joinedCount || 0)) {
+      errors.volunteersNeeded = `${existing.joinedCount} volunteers have already joined, so this cannot be lower`;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return res.status(400).json({ message: Object.values(errors)[0], errors });
+    }
+
+    await events.updateOne({ _id }, { $set: { ...data, updatedAt: new Date() } });
+    res.json({ message: "Event updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not update the event" });
+  }
+});
+
+router.delete("/events/:id", verifyToken, async (req, res) => {
+  try {
+    const _id = toObjectId(req.params.id);
+    if (!_id) return res.status(400).json({ message: "Invalid event id" });
+
+    const db = getDB();
+    const existing = await db.collection("events").findOne({ _id });
+    if (!existing) return res.status(404).json({ message: "Event not found" });
+
+    if (existing.creatorEmail !== req.user.email) {
+      return res.status(403).json({ message: "You can only delete your own events" });
+    }
+
+    await db.collection("events").deleteOne({ _id });
+    await db.collection("joins").deleteMany({ eventId: _id });
+    res.json({ message: "Event deleted" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Could not delete the event" });
+  }
+});
 
 export default router;
